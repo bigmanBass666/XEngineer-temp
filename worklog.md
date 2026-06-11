@@ -19,3 +19,21 @@ Stage Summary:
 - XEngineer仓库已就绪，所有文件已纳入git跟踪
 - 与平台系统的.git完全隔离，fullstack skill不影响
 - 旧batch4-template/保留在根目录作为参考
+
+---
+Task ID: 3e
+Agent: Super Z (Main)
+Task: 建立GitHub临时远程仓库 + 自动push + 迁移敏感文件
+
+Work Log:
+- 从 upload/ 复制 .env 到 XEngineer/.env（chmod 600，不进git）
+- 解压 agnes-ai.zip 到 docs/agnes-ai/（3个API参考文档进git）
+- 创建GitHub临时私有仓库: bigmanBass666/XEngineer-temp
+- 设置 .git/hooks/post-commit 自动push
+- 验证：每次本地commit后自动同步到远程
+
+Stage Summary:
+- 远程仓库: https://github.com/bigmanBass666/XEngineer-temp (private)
+- 双重保险：本地git + 远程GitHub，即使容器重置也能从远程恢复
+- .env 本地运行用，备份在 upload/.env
+- 正式参赛时：git checkout --orphan newmain → 压成1个干净commit → 推到新仓库
