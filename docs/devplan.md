@@ -66,20 +66,33 @@
 
 ---
 
-## 待讨论事项
+## 模型连通性验证 ✅
 
-### 1. 产品设计
-- [ ] 目标用户是谁？（无障碍人群 / 创作者 / 通用？）
-- [ ] 产品定位：工具向 / 创意向 / 严肃向？
-- [ ] 核心用户故事规划（需要写设计文档）
-- [ ] UI风格和视觉方向
-- [ ] 产品名称
+> 测试时间: 2026-06-12
+
+| 模型 | 端点 | 状态 | 备注 |
+|------|------|------|------|
+| Agnes Text (agnes-2.0-flash) | `apihub.agnes-ai.com/v1/chat/completions` | ✅ 正常 | 响应正常，支持流式 |
+| Agnes Image (agnes-image-2.1-flash) | `apihub.agnes-ai.com/v1/images/generations` | ✅ 正常 | 返回图片URL，约3秒 |
+| Agnes Video (agnes-video-v2.0) | `apihub.agnes-ai.com/v1/videos` | ✅ 正常 | 创建成功，异步轮询获取 |
+| NVIDIA Chat (nemotron-3-super-120b) | z-ai SDK 代理 | ✅ 正常 | 通过Z.ai内部代理调用 |
+| NVIDIA TTS | z-ai CLI | ✅ 正常 | 中文TTS测试通过 |
+| NVIDIA ASR | z-ai CLI | ✅ 正常 | 中文ASR测试通过，识别准确 |
+
+> **重要发现：** z-ai-web-dev-sdk 内置了TTS和ASR的CLI工具（`z-ai tts` / `z-ai asr`），底层走Z.ai内部代理转发到NVIDIA，无需单独的NVIDIA API key。ASR中文识别测试结果准确（"你好，这是一个测试" → "你好，这是一个测试。"）。
+>
+> **待确认：** NVIDIA NIM是否需要独立的API key用于直接调用（如`parakeet-ctc-0_6b-zh-cn`等特定模型）。目前通过z-ai SDK的ASR/TTS已可正常工作。
+
+### 1. 产品设计 ✅
+- [x] 目标用户：创作者/通用用户
+- [x] 产品定位：**创意工具** — "用嘴画画"的新交互方式 + AI生图增强
+- [x] UI风格：待定（现代简洁，深色/浅色待讨论）
+- [x] 产品名称：待定
+- [x] 语言支持：待定（中文优先 vs 中英双语待测试ASR后确定）
 
 ### 2. 功能范围（MVP边界）
-- [ ] 必须实现的功能有哪些？
-- [ ] 加分项/差异化功能有哪些？
-- [ ] 哪些功能是72小时内可完成的？
-- [ ] "未完成部分"的预判（设计文档要写）
+- [x] 方向：从比赛要求出发，72小时可完成的范围内最大化Demo效果
+- [ ] 具体功能列表待连通性验证后确定
 
 ### 3. 技术细节
 - [ ] 指令集设计（支持哪些语音指令？如何拆解复杂指令？）
