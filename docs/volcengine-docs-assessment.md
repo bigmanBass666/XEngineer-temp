@@ -81,7 +81,40 @@
 
 ---
 
-## 四、执行状态
+## 四、Git 故障复盘与防护措施
+
+### 故障链
+
+1. **Remote URL 被篡改** — 某次操作（疑似 fullstack 初始化脚本）将 XEngineer 的 remote 从 `XEngineer-temp` 改为 `sceneforge`
+2. **GitHub Token 失效** — 旧 token `ghp_cHkP1...` 被撤销，push 静默失败
+3. **post-commit hook `2>/dev/null`** — 所有 push 错误被吞掉，无人知晓
+4. **Bash 工具 `cd` 不持久** — 每次 Bash 调用都回到根目录 `/home/z/my-project/`，在根目录执行的 `git remote set-url` 修改的是根目录的 sceneforge 仓库，不是 XEngineer 的
+
+### 已实施的修复
+
+- [x] 更新 GitHub Token（新 token 存入 `.env`）
+- [x] 修正 XEngineer remote URL（用 `GIT_DIR` 显式操作）
+- [x] 重写 post-commit hook：从 `.env` 动态读取 token，错误记录到 `.git/push-error.log`，不再静默
+- [x] Force push 同步了全部 37 个 commit
+
+### 防护规则（写入 worklog 规范）
+
+1. **操作 XEngineer git 时必须用绝对路径或 GIT_DIR**，因为 Bash `cd` 不持久：
+   ```bash
+   cd /home/z/my-project/XEngineer && git add <file> && git commit -m "msg"
+   ```
+   或：
+   ```bash
+   GIT_DIR=/home/z/my-project/XEngineer/.git git status
+   ```
+2. **子代理操作 XEngineer git 同理**，指令中必须包含完整路径
+3. **post-commit hook 从 .env 读取 token**，不再硬编码在 remote URL 中
+4. **push 错误不再静默**，写入 `.git/push-error.log`
+
+---
+
+## 五、执行状态
 
 - [x] 第一阶段：站点规模摸底完成
-- [ ] 第二阶段：核心文档抓取（待主代理确认后执行）
+- [x] 第二阶段：核心文档抓取完成（19个文件，~608KB）
+- [x] Git 故障修复完成
