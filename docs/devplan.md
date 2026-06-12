@@ -8,36 +8,74 @@
 
 ## 已确定事项
 
-### 1. 选题：题目二 — AI 语音绘图工具 ✅
+### 1. 选题：🔄 待重新评估（题目一 vs 题目二）
 
-**决策理由：**
-- Agnes 3个模型能用上2个（Text+Image），Video可做Demo素材，利用率最高
-- 蓝海赛道，直接竞品极少，差异化空间大（题目一有Pipecat/LiveKit等大量成熟项目）
-- 技术栈更轻，无需WebRTC/视频流处理，精力集中在体验打磨
-- "用嘴说一句话就生成一幅画"是其他竞品都没有的杀手锏
+**选题评估历史：**
+- 初步选择题目二（蓝海、竞品少、模型利用率高）
+- 分析后发现题目一Demo冲击力更强，考虑切换
+- 用户提供了VoiceChat_App.zip（基于nemotron-voicechat），派子代理分析后确认：
+  - **该应用并未调用NVIDIA nemotron-voicechat API**
+  - 后端全部使用`z-ai-web-dev-sdk`（Z.ai内网代理，Netlify不可用）
+  - "Nemotron"仅是前端UI品牌文案，不是真正的voicechat模型
+  - 该资源已清理删除
+- **重大发现：火山引擎豆包语音资源远超预期**（见下方火山引擎资源矩阵）
+- 当前状态：两个选题均已有完整的公网可用模型方案，待最终决策
+
+**当前两个方向的对比（更新版）：**
+
+| 维度 | 题目一（AI视觉对话助手） | 题目二（AI语音绘图工具） |
+|------|------------------------|------------------------|
+| Demo冲击力 | 强（摄像头+实时对话，视觉冲击） | 较弱（Canvas绘图，视觉呈现有限） |
+| 赛道竞争 | 红海（Pipecat/LiveKit等大量成熟项目） | 蓝海（直接竞品极少） |
+| 代码相似度风险 | 中（架构容易撞车，但手搓可规避） | 低（竞品少，几乎无风险） |
+| 模型方案完整性 | ✅ 火山ASR+Agnes Text+火山TTS | ✅ 火山ASR+Agnes Text+Agnes Image |
+| 技术复杂度 | 高（多模态融合、实时音视频） | 中（Canvas+指令解析） |
+| 部署可行性 | ⚠️ 需验证火山引擎WebSocket能否从Netlify前端直连 | ✅ 全部公网HTTP/WebSocket API |
+| 成本控制要求 | 题目明确要求，需写设计文档 | 无硬性要求 |
 
 ### 2. 模型方案 ✅
 
-**核心原则：Agnes优先，火山引擎/NVIDIA补充。**
+**核心原则：Agnes优先，火山引擎补充。**
 
-| 环节 | 模型 | 来源 |
-|------|------|------|
-| 语音→文字(中文) | 火山引擎 bigmodel_async（双向流式） | 火山引擎 |
-| 语音→文字(兜底) | 浏览器原生 SpeechRecognition API | 浏览器内置 |
-| 指令解析/对话 | `agnes-2.0-flash` | Agnes |
-| AI生图 | `agnes-image-2.1-flash` | Agnes |
-| 设计文档参考 | `agnes-2.0-flash`（Thinking模式） | Agnes |
+**两个方向的模型方案（选题未最终确定，两个方案并行准备）：**
+
+#### 题目一方案（AI视觉对话助手）
+
+| 环节 | 模型 | 来源 | 状态 |
+|------|------|------|------|
+| 语音→文字(中文) | 火山引擎 Seed-ASR 2.0（大模型流式） | 火山引擎 | ✅ 已有Key |
+| 视觉理解+对话 | `agnes-2.0-flash`（base64截图） | Agnes | ✅ 已验证 |
+| 文字→语音 | 火山引擎 Seed-TTS 2.0（大模型合成） | 火山引擎 | ⚠️ 待验证 |
+| 语音→文字(兜底) | 浏览器原生 SpeechRecognition API | 浏览器内置 | ✅ |
+| 文字→语音(兜底) | 浏览器原生 SpeechSynthesis API | 浏览器内置 | ✅ |
+
+#### 题目二方案（AI语音绘图工具）
+
+| 环节 | 模型 | 来源 | 状态 |
+|------|------|------|------|
+| 语音→文字(中文) | 火山引擎 Seed-ASR 2.0（大模型流式） | 火山引擎 | ✅ 已有Key |
+| 指令解析 | `agnes-2.0-flash` | Agnes | ✅ 已验证 |
+| AI生图 | `agnes-image-2.1-flash` | Agnes | ✅ 已验证 |
+| 语音→文字(兜底) | 浏览器原生 SpeechRecognition API | 浏览器内置 | ✅ |
 
 > 详细模型清单见 `docs/model-selection.md`
 
 ### 3. 代码相似度策略 ✅
 
-- **全部手搓，不借鉴开源项目业务代码**
-- 不用 `create-next-app` 等CLI工具生成模板，手动建项目
-- 题目二核心代码（Canvas绘图引擎、指令解析逻辑、状态管理）均为原创
-- API调用代码（fetch Agnes/NVIDIA）属于标准写法，不构成相似度风险
-- 第三方库使用需在README中列明依赖
-- 规则原文：代码重复率50%以上取消路演资格 + 列入招聘黑名单
+**底线：代码文本重复率不超过50%。**
+
+**核心原则：思想可用，代码手搓。**
+
+- ✅ 可以：学习成熟项目的架构设计思想（如Pipecat的Pipeline编排、LiveKit的WebRTC传输方案）
+- ✅ 可以：借鉴已验证的技术方案（如aiwebcam2的"截图→VLM"链路、流式VLM的帧率控制策略）
+- ✅ 可以：利用踩坑经验规避已知问题（如ASR需要VAD避免误触发、TTS需要打断支持）
+- ❌ 禁止：复制/搬运任何开源项目的业务代码
+- ❌ 禁止：直接使用框架的核心实现（如直接import Pipecat/LiveKit SDK）
+- ❌ 禁止：翻译开源项目的实现代码
+
+> 调研文档（research-topic1.md、research-topic2.md）的核心价值就在于此：
+> 它们记录的是**已被实战验证有效的架构思想和踩坑经验**，这些思想资产完全可以利用。
+> 每一行代码我们自己写，但设计决策基于前人经验，这是最高效的参赛策略。
 
 ### 4. 参赛形式：单人 ✅
 
@@ -49,11 +87,23 @@
 | 语言 | TypeScript |
 | 样式 | Tailwind CSS 3 |
 | 包管理 | pnpm |
-| 绘图 | 原生 Canvas API（手搓） |
-| ASR | 火山引擎 bigmodel_async（浏览器直连WebSocket） |
-| LLM | Agnes Text API |
-| 生图 | Agnes Image API |
 | 部署 | GitHub + Netlify |
+
+#### 题目一额外技术栈
+| 类别 | 选型 |
+|------|------|
+| ASR | 火山引擎 Seed-ASR 2.0（WebSocket直连） |
+| 视觉理解 | Agnes Text（base64截图 via HTTP POST） |
+| TTS | 火山引擎 Seed-TTS 2.0（HTTP/WebSocket） |
+| 摄像头 | 浏览器 getUserMedia API |
+
+#### 题目二额外技术栈
+| 类别 | 选型 |
+|------|------|
+| ASR | 火山引擎 Seed-ASR 2.0（WebSocket直连） |
+| 指令解析 | Agnes Text（HTTP POST） |
+| 绘图 | 原生 Canvas API（手搓） |
+| 生图 | Agnes Image（HTTP POST） |
 
 ### 6. 代码仓库策略 ✅
 
@@ -68,7 +118,7 @@
 
 ## 模型连通性验证 ✅
 
-> 测试时间: 2026-06-12
+> 测试时间: 2026-06-12（持续更新）
 
 | 模型 | 端点 | 状态 | Netlify可用？ | 备注 |
 |------|------|------|-------------|------|
@@ -77,7 +127,22 @@
 | Agnes Video (agnes-video-v2.0) | `apihub.agnes-ai.com/v1/videos` | ✅ 正常 | ✅ | 公网端点，异步轮询 |
 | NVIDIA LLM (nemotron-3-super) | `integrate.api.nvidia.com/v1` | ✅ 正常 | ✅ | 公网端点，有key能用 |
 | NVIDIA ASR/TTS/voicechat | N/A | ❌ 不可用 | ❌ | 需本地Docker+GPU部署，非云端API |
-| 火山引擎 流式ASR (bigmodel_async) | `wss://openspeech.bytedance.com` | ✅ 待测 | ⚠️ | 需WebSocket代理或直连 |
+| 火山引擎 大模型流式ASR 2.0 | `wss://openspeech.bytedance.com/api/v3/sauc/bigmodel` | ⚠️ 待测 | ⚠️ | 已有Key，需验证Netlify前端可直连 |
+| 火山引擎 大模型TTS 2.0 | `wss://openspeech.bytedance.com/api/v3/tts/bidirection` | ⚠️ 待测 | ⚠️ | 已有Key，需验证API可用性 |
+| 火山引擎 端到端实时语音大模型 | 待确认WebSocket端点 | ⚠️ 待查 | ⚠️ | Speech2Speech，可能直接解决语音通道 |
+
+> **关键发现（已全面验证）：**
+> 1. NVIDIA NIM 托管 API（`integrate.api.nvidia.com`）只有120个文本/视觉/嵌入模型，**语音模型均不在托管API上**
+> 2. `nemotron-voicechat` 需**本地Docker部署 + 2张GPU(共128GB+ VRAM)**，不是云端HTTP API
+> 3. VoiceChat_App.zip 分析结论：后端全部用`z-ai-web-dev-sdk`，不是真正的NVIDIA voicechat API调用
+> 4. `z-ai tts` / `z-ai asr` 走Z.ai内部代理（`internal-api.z.ai`），仅开发环境可用，Netlify不可用
+> 5. Agnes 3个端点全部公网可访问，Netlify部署后可直接使用
+> 6. **火山引擎豆包语音资源远超预期**：不仅有ASR，还有TTS、端到端语音大模型、声音复刻等13大产品线
+
+> **待验证项：**
+> - 火山引擎WebSocket端点能否从Netlify部署的前端直接连接（CORS/WebSocket政策）
+> - 火山引擎大模型TTS的API调用方式和音质
+> - 火山引擎端到端实时语音大模型的具体端点和接入方式
 
 > **关键发现（已全面验证）：**
 > 1. NVIDIA NIM 托管 API（`integrate.api.nvidia.com`）只有120个文本/视觉/嵌入模型，**语音模型均不在托管API上**
@@ -92,6 +157,19 @@
 > - 详见 `docs/api/Volcengine-ASR-Streaming.md`
 
 ### 7. 题目分析与评委关注点 ✅
+
+#### 题目一分析
+
+**题目一原文核心要求：**
+> 打开摄像头与麦克风，让AI能够看到摄像头中的视频内容、听到用户说的话，并给予恰当的回应。
+> 请综合考虑：视觉内容的理解准确性、语音交互的自然度与流畅性、端云协同的成本控制策略。
+
+**评委看重的三个维度：**
+1. **视觉理解准确性** — AI能看懂什么？看错的概率多低？
+2. **语音交互自然度与流畅性** — 像不像跟真人聊天？延迟多低？
+3. **成本控制策略** — 用了多少资源？怎么优化的？
+
+#### 题目二分析
 
 **题目二原文核心要求：**
 > 用户不能使用鼠标或键盘，仅通过语音指令完成绘图创作。请综合考虑：
@@ -124,6 +202,45 @@
 - **语音→理解→执行**这条链路的流畅度和智能程度才是灵魂
 - **LLM指令解析**是唯一能体现"AI"的地方，是核心投入重点
 - Canvas绘图是载体，AI生图是加分项，指令理解才是主体
+
+### 8. 火山引擎豆包语音资源矩阵 ✅
+
+> 调研时间: 2026-06-12
+> 控制台: https://console.volcengine.com/speech
+> 已有密钥: APP_ID, ACCESS_TOKEN, SECRET_KEY（在.env中）
+
+**对Hackathon有价值的资源：**
+
+| 服务 | API协议 | 免费/计费 | 对我们的价值 |
+|------|---------|----------|------------|
+| **大模型流式ASR 2.0** (Seed-ASR) | WebSocket | 20h免费/应用 | 两个选题的ASR首选 |
+| **一句话识别** | WebSocket | 按次计费 | 题目二短指令备选 |
+| **大模型TTS 2.0** (Seed-TTS) | HTTP SSE / WebSocket | 免费接入 | **题目一TTS方案（替代浏览器原生）** |
+| **端到端实时语音大模型** (RealtimeAPI) | WebSocket | 有免费额度 | **题目一语音通道备选（S2S）** |
+| **声音复刻** | HTTP REST | 88元/音色 | 可选加分项 |
+| **热词管理** | HTTP REST | 免费 | 题目二绘图术语、题目一领域词汇 |
+
+**ASR三种模式对比：**
+
+| 模式 | WebSocket地址 | 特点 |
+|------|----------------|------|
+| 双向流式 | `wss://openspeech.bytedance.com/api/v3/sauc/bigmodel` | 边说边出字，延迟最低 |
+| 流式输入 | `wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async` | 流式输入+句级输出，适合等说完再处理 |
+| 非流式 | `wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_nostream` | 一次性输入完整音频 |
+
+**TTS接口：**
+
+| 接口 | 协议 | 特点 |
+|------|------|------|
+| HTTP SSE单向流式 V3 | HTTP SSE | 一次性输入文本，流式输出音频 |
+| WebSocket双向流式 V3 | WebSocket | 文本流式输入，音频流式输出，低时延 |
+| HTTP非流式 V1 | HTTP | 旧版，不推荐 |
+
+**端到端实时语音大模型（Speech2Speech）：**
+- 语音输入→理解→语音输出，一步到位
+- 支持中英文
+- WebSocket协议
+- 如果可用，可替代 ASR+Chat+TTS 三段式方案
 
 ---
 
