@@ -120,16 +120,23 @@ main (受保护)
 
 ### 6.2 是否保护 main 分支（要求 PR 合并）
 
-**我的建议：不保护。**
+**选项分析：**
 
-理由：
-1. **保护 main 的目的是防止直接 push**，但我们已经通过 worklog 规范（❌ 直接在 main 上 commit）+ 人工纪律来约束了
-2. GitHub branch protection 要求 PR 合并后，每次 push 到功能分支也会被要求 CI 通过（如果配了 CI）。我们没有 CI，保护规则反而可能造成不必要的阻碍
-3. **单人参赛**，没有多人协作冲突风险，保护 main 的收益很低
-4. 如果不小心直接在 main 上 commit 并 push，后果只是少了一个 PR 记录（这在 40% 的过程分里扣一点分），但不会导致代码损坏
-5. 反而如果 branch protection 出问题（比如设置了但忘记配权限），可能导致 PR 都合不进去，浪费时间
+**如果开启 main 保护（Require a pull request before merging）：**
+- ✅ 我（AI）不需要用户手动 merge — 可以通过 GitHub API 自动创建 PR + merge PR
+- ✅ 单人参赛，不开 "Require approvals"（代码审查），所以不会卡在审批环节
+- ✅ 不需要 CI（不开 "Require status checks"），不会卡在 CI 上
+- ⚠️ 增加了复杂度：每次功能完成需要额外调用 GitHub API 创建+合并 PR
+- ⚠️ 如果 API 调用出问题（token、网络等），PR 卡着合不进去，需要用户手动处理
+- ⚠️ 之前已经有 token 失效 + push 静默失败的前科，再加一层 API 操作就是再加一层风险
 
-**结论：靠规范而非技术强制。** 如果后期觉得有必要，随时可以在 GitHub Settings 加保护。
+**如果不保护：**
+- ✅ 流程简单：分支开发 → push → 手动在网页创建 PR → 网页点击 merge
+- ✅ 少一个故障点
+- ❌ 万一我或子代理忘记创建分支直接在 main 上 commit，不会报错（靠规范约束）
+- ❌ 评委如果查看 commit 历史可能看到没有 PR 记录的 commit（但当前的文档 commit 本来就没有 PR）
+
+**结论待定：需要讨论。**
 
 ### 6.3 PR 用 squash merge 还是 merge commit
 
