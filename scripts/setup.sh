@@ -32,6 +32,28 @@ if [ -f .git/hooks/post-commit ]; then
     echo "[INFO] 旧的 .git/hooks/post-commit 已备份为 .bak"
 fi
 
+# 6. 恢复 GitHub CLI (gh) — 容器重置后可能丢失
+if command -v gh &>/dev/null; then
+    echo "[OK] GitHub CLI 已安装: $(gh --version 2>/dev/null | head -1)"
+else
+    GH_DEB="/home/z/my-project/upload/gh_2.46.0-3_amd64.deb"
+    if [ -f "$GH_DEB" ]; then
+        echo "[INFO] GitHub CLI 未找到，正在从备份恢复..."
+        dpkg-deb -x "$GH_DEB" /tmp/gh-extract 2>/dev/null && \
+        cp /tmp/gh-extract/usr/local/bin/gh /usr/local/bin/gh 2>/dev/null && \
+        rm -rf /tmp/gh-extract
+        if command -v gh &>/dev/null; then
+            echo "[OK] GitHub CLI 已恢复: $(gh --version 2>/dev/null | head -1)"
+        else
+            echo "[WARN] GitHub CLI 恢复失败，请手动安装"
+        fi
+    else
+        echo "[WARN] GitHub CLI 未找到，且备份 deb 包不存在于 upload/"
+        echo "       手动恢复：curl -sLO http://deb.debian.org/debian/pool/main/g/gh/gh_2.46.0-3_amd64.deb"
+        echo "                 dpkg-deb -x gh_2.46.0-3_amd64.deb /tmp/gh && cp /tmp/gh/usr/local/bin/gh /usr/local/bin/gh"
+    fi
+fi
+
 echo ""
 echo "=== 初始化完成 ==="
 echo "后续 commit 将自动 push 到远程（post-commit hook）"
