@@ -130,9 +130,10 @@ TTS:   火山 TTS 2.0 HTTP（50+ 音色）
 
 ```
 音频采集链路：
-getUserMedia(16kHz, mono, echoCancellation)
-  → AudioContext + AudioWorklet（采集 PCM）
-  → VAD 检测（能量阈值，借鉴 VoiceChat_App 的实现）
+getUserMedia(16kHz, mono, echoCancellation)  // 采样率必须16000，匹配ASR要求
+  → AudioContext(sampleRate: 16000) + AudioWorklet（采集 PCM）
+  → PCM Float32 → Int16 转换（int16 = clamp(float32 * 32767, -32768, 32767)）
+  → VAD 检测（@ricky0123/vad-web，Silero VAD WASM封装）
   → 检测到语音开始 → 触发截图 + 开始发送音频
   → 检测到语音结束 → 停止发送，等待 AI 回复
   → AI 回复期间用户插话 → Barge-in：停止 TTS 播放，重新监听
@@ -140,7 +141,9 @@ getUserMedia(16kHz, mono, echoCancellation)
 
 **已决策：VAD 在前端做** ✅
 - 理由：LiveKit/Pipecat/VoiceChat_App 均在前端处理 VAD
-- 优势：降低后端复杂度，减少音频传输量，实现简单（能量阈值）
+- 方案：`@ricky0123/vad-web`（Silero VAD 的 WASM 封装，成熟稳定，npm直接安装）
+- 采样率：前端 AudioContext 强制 `sampleRate: 16000`，避免浏览器默认44100Hz与ASR不匹配
+- PCM格式：AudioWorklet 输出 Float32，需转为 Int16（`int16 = clamp(float32 * 32767, -32768, 32767)）`
 
 ### 3.3 前后端通信协议
 
@@ -166,7 +169,7 @@ getUserMedia(16kHz, mono, echoCancellation)
 
 ```
 后端 ASR Node 职责：
-  1. 接收前端 base64 PCM → 解码为原始 PCM
+  1. 接收前端 base64 PCM（Int16, 16kHz, mono）→ 解码为原始 bytes
   2. Gzip 压缩（火山要求）
   3. 构造 4 字节二进制 header（前 2 字节 payload 长度大端序）
   4. 通过 WebSocket 发送给火山 ASR
@@ -181,9 +184,16 @@ getUserMedia(16kHz, mono, echoCancellation)
   - 推荐模式: bigmodel_async（仅结果变化时返回，RTF 最优）
   - 分包策略: 每包 200ms（双向流式最优发包间隔）
   - VAD 判停: 默认 800ms，可配 end_window_size（最小 200ms）
+
+技术选型：
+  - WebSocket 客户端: websockets（asyncio 原生，与 FastAPI 异步生态一致）
+  - Gzip: Python 标准库 gzip 模块
+  - PCM 解码: base64.b64decode → struct.unpack('<h', ...)
 ```
 
-**风险缓解：** 直接基于火山官方 Python Demo 改造（`docs/api/volcengine/seed-asr-streaming.md` 含完整协议说明和 Demo 代码链接）
+**风险缓解：**
+- 直接基于火山官方 Python Demo 改造（`docs/api/volcengine/seed-asr-streaming.md` 含完整协议说明和 Demo 代码链接）
+- **Fallback 策略**：Phase 1.4 给 4h，若二进制协议无法调通，立即启用浏览器端 Web Speech API 作为 ASR 替代（前端直接识别语音，只传文本给后端，跳过 ASR Node）
 
 **延迟目标：** 流式输入 5s 音频 → 300~400ms 返回
 
@@ -215,14 +225,19 @@ getUserMedia(16kHz, mono, echoCancellation)
 ```
 后端 TTS Node 职责：
   1. 接收 Pipeline 传入的一句话文本
-  2. 调用火山 TTS HTTP 接口（X-Api-Key 鉴权）
-  3. 接收 Chunked 音频流（mp3）
-  4. 将音频 chunk 实时通过 WebSocket 推送给前端
+  2. 调用火山 TTS HTTP 接口（Authorization: Bearer 鉴权）
+  3. 接收返回的完整音频（base64 mp3，非真正流式chunk）
+  4. 将音频通过 WebSocket 推送给前端播放
 
 关键参数：
   - voice_type: zh_female_vv_uranus_bigtts (Vivi 2.0)
   - response_format: mp3
   - speed_ratio: 1.0
+
+技术选型：
+  - HTTP 客户端: httpx（支持 async，与 FastAPI 生态一致）
+  - 注意：火山 TTS HTTP 接口返回完整 base64 音频，非真正的流式 chunk
+  - 降级方案：若火山 TTS 不可用，可用浏览器端 SpeechSynthesis API 作为前端 TTS
 ```
 
 ### 3.7 前端音频播放
@@ -288,20 +303,42 @@ Barge-in 机制：
 
 ## 五、开发里程碑（72h）
 
+### StubNode 模式（保证每个PR合并后 main 可运行）
+
+> 比赛规则要求「PR合并后，主分支代码需保持可运行状态，评委在任意时间查看应能复现演示效果」。
+> Pipeline 在部分 Node 未实现时，使用 StubNode 透传：
+> - StubASRNode：收到音频后直接返回固定文本 `"(ASR stub) hello"`
+> - StubVLMNode：收到文本后直接返回 `"(VLM stub) I see a camera feed"`
+> - StubTTSNode：收到文本后返回空（不播放语音）
+> - 每个真实 Node 实现后替换对应 StubNode，Pipeline 始终可运行
+
 ### Phase 1：基础搭建 + API 连通性验证（8h）
 
 | # | 任务 | 估时 | 产出 |
 |---|------|------|------|
-| 1.1 | Python FastAPI 后端初始化 + WebSocket 端点 | 1h | 项目骨架 + ws 端点 |
+| 1.1 | Python FastAPI 后端初始化 + WebSocket 端点 + CORS | 1h | 项目骨架 + ws 端点 + CORS配置 |
 | 1.2 | Vite + React 前端初始化 + 基础页面 | 1h | 项目骨架 + 首页 |
-| 1.3 | 前后端 WebSocket 连通测试 | 1h | 能收发 JSON 消息 |
-| 1.4 | **火山 ASR 连通性测试** | 2h | Python 能调通二进制协议，返回识别结果 |
+| 1.3 | 前后端 WebSocket 连通测试 + StubNode 骨架 | 1h | 能收发 JSON，Pipeline 骨架可运行 |
+| 1.4 | **火山 ASR 连通性测试（最高优先级）** | 2-4h | Python 能调通二进制协议；**4h 不通 → 切 Web Speech API** |
 | 1.5 | **Agnes API 连通性测试**（✅已验证公网可达） | 0.5h | Python 能调通 Agnes Text（含图片） |
 | 1.6 | **火山 TTS 连通性测试** | 1h | Python 能调通 TTS，返回音频 |
 | 1.7 | 环境配置（.env、依赖安装） | 1.5h | requirements.txt + .env 模板 |
 
 > Phase 1 目标：**三个外部 API 全部可通**。任何一个不通需要立即调整方案。
-> **Go/No-Go 检查点**：Phase 1 结束时评估三个 API 的连通性，决定是否继续或切换备选方案。
+> **Go/No-Go 检查点**：
+> - ASR: 4h 不通 → 切浏览器 Web Speech API（前端直接识别，跳过 ASR Node）
+> - TTS: 不通 → 切浏览器 SpeechSynthesis API（前端直接合成语音）
+> - Agnes: 不通 → 切其他免费 VLM API（需额外调研备选）
+
+### Phase 4 补充：合规模板占位
+
+> Phase 4.1 设计文档须包含以下结构（赛题要求）：
+>
+> **设计文档结构：**
+> 1. 计划实现的用户故事 vs 最终实现对照表
+> 2. 计划采用的成本控制技巧 vs 实际采用对照表
+> 3. 第三方依赖清单（库名 + 用途 + 许可证）
+> 4. 原创功能说明（哪些是自主设计，哪些借鉴了开源项目的思想）
 
 ### Phase 2：核心链路实现（20h）
 
@@ -329,9 +366,9 @@ Barge-in 机制：
 
 | # | 任务 | 估时 | 产出 |
 |---|------|------|------|
-| 4.1 | 设计文档（用户故事 + 成本控制） | 3h | 赛题要求 |
-| 4.2 | Demo 视频录制 | 2h | 展示完整交互 |
-| 4.3 | README（依赖说明 + 运行方式） | 1h | 评委可复现 |
+| 4.1 | **设计文档**（用户故事计划vs实际 + 成本控制计划vs实际 + 依赖清单 + 原创说明） | 3h | 赛题要求 |
+| 4.2 | Demo 视频录制（上传 bilibili，链接放 README） | 2h | 展示完整交互 |
+| 4.3 | README（依赖说明 + 运行方式 + 原创功能 + 第三方依赖清单） | 1h | 评委可复现 |
 | 4.4 | Bug 修复 + 体验打磨 | 2h | 最终检查 |
 
 ### 总计：~48h（含余量）
@@ -398,5 +435,11 @@ xengineer-backend/           # 后端（Python FastAPI）
 | 3 | 音频交互模式？ | ✅ **VAD 自动检测** | 所有成熟开源项目都用 VAD，push-to-talk 体验差，不适合"自然对话"赛题定位 |
 | 4 | 前后端消息协议？ | ✅ **单 WS + JSON 消息类型** | 够用且简单，aiwebcam2 验证过此模式可行 |
 | 5 | S2S 是否作为 MVP 后加分项？ | ✅ **是，MVP 不含** | S2S 不支持视觉输入是硬伤，MVP 先用级联方案（Agnes 直接收图），S2S 作为语音对话模式升级 |
+| 6 | ASR 连不通怎么办？ | ✅ **4h 不通切 Web Speech API** | 浏览器原生 ASR，前端直接识别，跳过后端 ASR Node |
+| 7 | 中间 PR 合并后 main 能跑吗？ | ✅ **StubNode 透传模式** | 比赛规则要求 PR 合并后 main 可运行，未实现的 Node 用 Stub 替代 |
+| 8 | VAD 用什么方案？ | ✅ **@ricky0123/vad-web** | Silero VAD 的 WASM 封装，成熟稳定，npm 直接安装 |
+| 9 | Python HTTP/WebSocket 库？ | ✅ **httpx + websockets** | httpx 支持 async + SSE；websockets 是 asyncio 原生 WS 客户端 |
+| 10 | PCM 格式要求？ | ✅ **Int16, 16kHz, mono** | 前端 AudioContext 强制 sampleRate:16000，Float32→Int16 转换 |
 
-> 所有决策项已确认，计划状态：**开发就绪**。
+> 所有决策项已确认，计划状态：**开发就绪（审查通过）**。
+> 审查报告：`plans/devplan-review-report.md`
