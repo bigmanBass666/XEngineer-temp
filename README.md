@@ -2,6 +2,8 @@
 
 > AI 视觉对话助手 — 七牛云 AI Hackathon
 
+https://www.bilibili.com/video/BV1DqJA6VEx4/
+
 ## 项目简介
 
 XEngineer 是一个 **AI 视觉对话助手**，用户可以通过语音和摄像头与 AI 进行实时多模态交互。AI 能"看到"用户展示的实物、文档、屏幕内容，并通过语音进行自然对话。
