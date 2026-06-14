@@ -52,13 +52,13 @@ PUSH_URL="https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/${GITHUB_USER}/${GIT
 
 echo "[$(timestamp)] INFO: 开始自动push..." >> "$LOG_FILE"
 
-if git push "$PUSH_URL" main >> "$LOG_FILE" 2>&1; then
+if git push "$PUSH_URL" HEAD >> "$LOG_FILE" 2>&1; then
     echo "[$(timestamp)] INFO: push 成功" >> "$LOG_FILE"
 else
     echo "[$(timestamp)] ERROR: push 失败，3秒后重试..." >> "$LOG_FILE"
     echo "[$(timestamp)] ERROR: push 失败，3秒后重试..." >&2
     sleep 3
-    if git push "$PUSH_URL" main >> "$LOG_FILE" 2>&1; then
+    if git push "$PUSH_URL" HEAD >> "$LOG_FILE" 2>&1; then
         echo "[$(timestamp)] INFO: 重试push成功" >> "$LOG_FILE"
     else
         echo "[$(timestamp)] ERROR: 重试仍失败" >> "$LOG_FILE"
