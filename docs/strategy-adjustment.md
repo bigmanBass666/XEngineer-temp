@@ -138,6 +138,37 @@ main (受保护)
 
 **结论待定：需要讨论。**
 
+### 6.2.1 PR 操作方式：GitHub API vs GitHub CLI
+
+**如果开分支保护，每次功能完成需要：**
+1. 创建功能分支 → push
+2. 创建 PR
+3. 合并 PR
+4. 同步本地 main
+
+步骤 2-3 有两种方式：
+
+**方式A：GitHub REST API**
+- 用 curl 调用 `POST /repos/{owner}/{repo}/pulls` 创建 PR
+- 用 curl 调用 `PUT /repos/{owner}/{repo}/pulls/{number}/merge` 合并 PR
+- 优点：不需要额外安装任何工具
+- 缺点：命令冗长，URL 拼接容易出错，需要手动处理 JSON，token 需要自己拼 header
+
+**方式B：GitHub CLI（gh）**
+- `gh pr create --title "..." --body "..." --base main --head feat/xxx`
+- `gh pr merge --squash`
+- 优点：命令简短直观，一行搞定，自动处理认证和 JSON，支持 `gh pr status` 查看状态
+- 缺点：需要安装 `gh`
+
+**我的建议：装 GitHub CLI。**
+
+理由：
+1. 命令简单，不容易出错（curl 拼错 URL 是常有的事）
+2. 子代理也能轻松使用（`gh pr create` 比 curl 构造 JSON 请求门槛低得多）
+3. 安装简单：`apt install gh` 或下载二进制，一次性操作
+4. 认证一次配好后续自动复用
+5. 我们用的 token 已有 repo 权限，`gh auth login --with-token` 一行就能配好
+
 ### 6.3 PR 用 squash merge 还是 merge commit
 
 **我的建议：squash merge。**
