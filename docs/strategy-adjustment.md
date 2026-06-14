@@ -15,7 +15,7 @@
 | 项目 | 当前值 | 是否需要调整 |
 |------|--------|-------------|
 | 仓库名 | `bigmanBass666/XEngineer-temp` | ⚠️ 见下方讨论 |
-| 可见性 | private | ❌ 比赛要求**公开仓库** |
+| 可见性 | public | ✅ 已改为公开 |
 | 分支 | main（直接在 main 上开发） | ⚠️ 比赛要求 GitHub flow（PR） |
 | Commit 规范 | `<type>: <中文描述>` | ✅ 可保留 |
 | 现有 commit | 37+ 个（含文档准备工作） | ⚠️ 时间戳合规问题 |
@@ -34,16 +34,13 @@
 
 ## 四、需要调整的事项
 
-### 4.1 仓库可见性：private → public
+### 4.1 仓库可见性：private → public ✅ 已完成
 
-**问题：** 当前 XEngineer-temp 是 private，比赛要求公开。
-
-**方案：** 将 XEngineer-temp 改为 public。
+**状态：** 已改为 public。
 - 好处：不需要开新仓库，所有 commit 历史保留
 - 坏处：仓库名叫 "XEngineer-temp" 不够正式（但比赛没要求仓库名）
 - 风险：准备阶段的 commit 都是文档调研，不涉及代码，评委看到也无妨
-
-**操作：** 在 GitHub Settings → Danger Zone → Change visibility → Public
+- 额外好处：public 仓库免费账户可以开启分支保护功能（private 仓库需要 GitHub Pro）
 
 ### 4.2 开发模式：直接 main → GitHub flow（分支 + PR）
 
@@ -138,12 +135,12 @@ main (受保护)
 
 **结论：开启分支保护。** 理由：系统强制比靠纪律可靠，且我可以通过 GitHub CLI 自动操作 PR，不需要用户手动 merge。
 
-**待执行的步骤：**
-1. 安装 GitHub CLI（`gh`）
-2. 配置认证（`gh auth login --with-token`）
-3. 开启 main 分支保护（Require PR，不开 Require approvals，不开 Require status checks）
-4. 更新 post-commit hook：push 当前分支而非硬编码 `main`
-5. 验证：创建一个测试分支 → commit → push → 创建 PR → merge → 确认 main 更新
+**执行状态：**
+1. ✅ 安装 GitHub CLI（`gh` v2.46.0）
+2. ✅ 配置认证（`GH_TOKEN` 环境变量，scope: repo）
+3. ✅ 开启 main 分支保护（Require PR + enforce_admins=true）
+4. ✅ 更新 post-commit hook：`git push HEAD` 推送当前分支
+5. ✅ 验证：PR #1 创建+ squash merge 成功，admin 直接 push 被拒绝
 
 ### 6.3 PR 用 squash merge 还是 merge commit
 
